@@ -1,0 +1,9 @@
+[package]
+name = "gateway"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+domain = { path = "../domain" }
+broker = { path = "../broker" }
+

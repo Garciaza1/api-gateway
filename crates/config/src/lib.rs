@@ -1,0 +1,2 @@
+// Gerenciamento centralizado de configuração
+

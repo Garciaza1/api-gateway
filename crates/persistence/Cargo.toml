@@ -1,0 +1,8 @@
+[package]
+name = "persistence"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+domain = { path = "../domain" }
+

@@ -1,0 +1,198 @@
+Estrutura geral do monolito
+
+1.1 Um único binário
+O projeto deve gerar um único executável com um main.rs que:
+inicializa logging e tracing
+carrega configuração
+cria as dependências compartilhadas
+registra e inicia cada módulo do sistema
+inicia o runtime async e bloqueia até o shutdown
+
+1.2 Módulos internos bem definidos
+O código deve ser organizado em módulos separados, por exemplo:
+gateway
+broker
+collab
+persistence
+metrics
+config
+domain (tipos compartilhados, eventos, erros)
+
+Cada módulo deve expor uma API clara em Rust: structs, traits e funções públicas.
+Comunicação entre módulos deve acontecer por interfaces, não por acesso direto a detalhes internos.
+
+1.3 Definição de tipos e mensagens comuns
+O monolito deve ter um módulo central para tipos de domínio, contendo:
+tipos de eventos do broker
+tipos de comandos e eventos de colaboração
+tipos básicos de autenticação e usuário
+erros comuns do sistema
+
+Todos os módulos usam esses tipos para se falar, evitando string solta para tudo.
+
+Módulo de configuração
+
+2.1 Fonte de configuração
+O sistema deve carregar configurações de:
+arquivo (por exemplo YAML ou TOML)
+variáveis de ambiente
+argumentos de linha de comando (se necessário)
+
+2.2 Estrutura de config tipada
+Deve existir uma struct AppConfig contendo:
+portas do servidor HTTP
+parâmetros do broker (tamanho de fila, diretório de armazenamento, etc)
+parâmetros de colaboração (tamanho máximo de documento, timeouts)
+opções de banco de dados
+nível de log e opções de tracing
+
+O main carrega essa config e a repassa para os módulos.
+
+Módulo de infraestrutura comum
+
+3.1 Runtime async único
+O monolito deve usar um único runtime async global (por exemplo tokio) inicializado no main.
+Nenhum módulo deve criar um segundo runtime.
+
+3.2 Pool de conexões e recursos compartilhados
+Se houver banco de dados, cache ou storage, o main deve criar os pools e passar referências para cada módulo que precisar.
+O lifetime desses recursos é o mesmo do processo.
+
+3.3 Sistema de logs e tracing
+O main deve inicializar logging estrutural e tracing distribuído localmente.
+Cada módulo usa o mesmo sistema de logs, incluindo:
+correlação por request id
+correlação por document id dentro da colaboração
+correlação por mensagem no broker
+
+Módulo gateway
+
+4.1 Servidor HTTP e WebSocket
+O gateway deve expor uma porta HTTP única para o mundo externo.
+Rotas REST principais para controle: login, criação de documento, listagem, histórico.
+Endpoint de WebSocket para comunicação em tempo real com os clientes.
+
+4.2 Autenticação e autorização
+Middleware para validar tokens em cada request.
+Regras de permissão por usuário e por documento.
+Rate limiting básico por IP ou usuário.
+
+4.3 Tradução para eventos internos
+O gateway não implementa regras de negócio de colaboração.
+Ele converte requisições do cliente em comandos internos para o broker.
+Ele se inscreve em eventos de atualização vindos do broker e os envia via WS aos clientes conectados.
+
+4.4 Gerenciamento de sessões em memória
+O módulo gateway é responsável por saber que conexões WebSocket estão ligadas a qual documento e usuário.
+Necessário para decidir para quem mandar cada atualização.
+
+Módulo broker em memória ou disco
+
+5.1 Tópicos e partições internos
+O módulo broker deve oferecer uma API interna para:
+criar tópicos e registrar consumidores
+publicar mensagens em um tópico
+consumir mensagens na ordem para uma partição
+
+Pelo menos três grupos de tópicos lógicos:
+comandos de documentos
+atualizações de documentos
+eventos de presença e auditoria
+
+5.2 Implementação dentro do monolito
+Nesta fase monolito, o broker pode ser:
+em memória com filas assíncronas, suportando múltiplos produtores e consumidores
+opcionalmente com persistência simples em disco, com log de append
+
+5.3 API interna em Rust
+O broker expõe traits para producer e consumer.
+Gateway e collab dependem dessas traits em vez da implementação concreta, o que permite um dia separar o broker em outro processo.
+
+Módulo de colaboração
+
+6.1 Núcleo de edição
+O módulo collab deve:
+manter o estado dos documentos em memória
+gerenciar CRDT ou OT para texto
+validar operações de edição
+
+6.2 Consumo de comandos
+Collab se registra como consumer de tópicos de comandos de documento no broker.
+Para cada evento recebido:
+valida permissão
+aplica a operação no documento
+calcula a nova versão e o delta resultante
+publica um evento de atualização no tópico de updates do documento
+
+6.3 Presença e sessão de documento
+O módulo collab deve controlar:
+quem está conectado em cada documento
+eventos de join e leave
+opção de estado de presença (digitando, só visualizando, etc)
+
+6.4 Persistência do estado
+Collab integra com o módulo de persistência para:
+carregar snapshot do documento ao primeiro uso
+gravar snapshots periódicos
+gravar histórico de operações se estiver ativado
+
+Módulo de persistência
+
+7.1 Interface genérica de storage
+O módulo de persistência expõe uma interface para:
+salvar e carregar documentos
+salvar e carregar snapshots
+registrar eventos de auditoria, se desejado
+
+7.2 Implementação inicial simples
+Pode usar um banco relacional, um KV embutido como sled ou arquivos no disco.
+O importante é que os detalhes fiquem isolados e o resto do monolito enxergue só a interface.
+
+Módulo de métricas e observabilidade
+
+8.1 Métricas de negócio
+Deve expor contadores e histogramas para:
+quantidade de documentos ativos
+quantidade de usuários conectados
+latência de operações de edição
+taxa de mensagens no broker
+
+8.2 Health check e readiness
+Expor um endpoint HTTP simples para health check.
+Gateway, broker, collab e persistência devem reportar seu status para o módulo de saúde.
+
+Requisitos de inicialização e ciclo de vida
+
+9.1 Ordem de bootstrap no main
+Carregar configuração
+Inicializar logs e tracing
+Inicializar runtime async
+Criar recursos compartilhados (DB, configs, etc)
+Inicializar broker
+Inicializar persistência
+Inicializar collab com acesso ao broker e persistência
+Inicializar gateway com acesso ao broker e ao módulo de auth
+Iniciar servidor HTTP do gateway
+Registrar handlers de shutdown gracioso
+
+9.2 Shutdown
+Ao receber sinal de encerramento:
+parar de aceitar novas conexões HTTP
+fechar WebSockets aos poucos
+drenar filas do broker se configurado para isso
+fazer flush de logs e snapshots finais
+
+Requisitos não funcionais
+
+10.1 Desempenho
+O sistema deve suportar múltiplos documentos ativos simultaneamente.
+Edições de um mesmo documento devem ser processadas em ordem e com baixa latência.
+
+10.2 Segurança
+Não aceitar operações sem autenticação válida.
+Isolar acesso por documento, não permitindo que um usuário veja ou edite documento que não seja dele ou compartilhado com ele.
+
+10.3 Testabilidade
+Cada módulo deve ter testes unitários próprios.
+O monolito deve ter pelo menos alguns testes de integração simulando:
+login, join de documento, edição, recebimento de updates.
