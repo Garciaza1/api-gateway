@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Broker inicializado");
     
     // 6. Inicializar persistence
-    let persistence = PersistenceAdapter::new(&config)?;
+    let persistence = PersistenceAdapter::new(&config).await?;
     tracing::info!("Persistence inicializado");
     
     // 7. Inicializar collab com acesso ao broker e persistência
