@@ -43,12 +43,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Collab inicializado");
     
     // 8. Inicializar gateway com acesso ao broker
-    let gateway = Gateway::new(&broker, &config)?;
+    let (gateway, shutdown_rx) = Gateway::new(&broker, &config)?;
     tracing::info!("Gateway inicializado");
     
     // 9. Iniciar servidor HTTP do gateway
     let gateway_handle = tokio::spawn(async move {
-        if let Err(e) = gateway.run_server().await {
+        if let Err(e) = gateway.run_server(shutdown_rx).await {
             tracing::error!("Erro no servidor gateway: {:?}", e);
         }
     });
