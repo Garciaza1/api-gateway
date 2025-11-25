@@ -1,0 +1,35 @@
+[workspace]
+members = [
+    "crates/domain",
+    "crates/broker",
+    "crates/collab",
+    "crates/persistence",
+    "crates/gateway",
+    "crates/config",
+    "crates/metrics",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[package]
+name = "gateway-bin"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+config = { path = "crates/config" }
+broker = { path = "crates/broker" }
+persistence = { path = "crates/persistence" }
+collab = { path = "crates/collab" }
+gateway = { path = "crates/gateway" }
+metrics = { path = "crates/metrics" }
+
+[[bin]]
+name = "gateway"
+path = "src/main.rs"
+

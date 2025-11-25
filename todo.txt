@@ -1,0 +1,4 @@
+1 - Middlware (Autenticação/Tracing) 🛡️: Como adicionar uma camada de middleware global ao seu Router para fazer autenticação ou logs detalhados de requisições?
+2 - WebSockets 💬: Como implementar a funcionalidade de WebSocket, já que você tem um módulo ws no seu projeto?
+3 - Estado Compartil🤝hado: Como injetar o Broker e a Persistence (os structs que o Gateway possui) nos seus handlers Axum, para que as rotas possam interagir com o backend?
+
