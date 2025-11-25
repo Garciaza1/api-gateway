@@ -1,6 +1,6 @@
 // Sistema de mensageria interno
 
-use std::sync::Arc;
+// use std::sync::Arc;
 
 pub struct Broker {
     // TODO: Implementar filas assíncronas em memória

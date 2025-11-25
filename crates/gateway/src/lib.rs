@@ -1,17 +1,17 @@
 // Define o build do servidor
 
+pub mod auth;
 pub mod http;
 pub mod ws;
-pub mod auth;
 
 pub use http::*;
 pub use ws::*;
-pub use auth::*;
+// pub use auth::*;
 use std::sync::Arc;
-use tokio::sync::{Mutex, oneshot};
 use tokio::net::TcpListener;
-use axum::serve;
-use crate::http::create_router;
+use tokio::sync::{oneshot, Mutex};
+// use axum::serve;
+// use crate::http::create_router;
 
 pub struct Gateway {
     port: u16,
@@ -23,32 +23,32 @@ impl Gateway {
     pub fn new(
         _broker: &broker::Broker,
         config: &config::AppConfig,
-    ) -> Result<(Self, oneshot::Receiver<()>), Box<dyn std::error::Error>>  {
+    ) -> Result<(Self, oneshot::Receiver<()>), Box<dyn std::error::Error>> {
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
         let gateway = Gateway {
             port: config.gateway_port,
-            shutdown_tx: Arc::new(Mutex::new(Some(shutdown_tx))), 
+            shutdown_tx: Arc::new(Mutex::new(Some(shutdown_tx))),
         };
 
         Ok((gateway, shutdown_rx))
     }
 
     pub async fn run_server(
-        &self, 
+        &self,
         shutdown_rx: tokio::sync::oneshot::Receiver<()>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let addr = format!("0.0.0.0:{}", self.port);
         tracing::info!("Gateway servidor rodando na porta {}", addr);
-        
+
         let listener = TcpListener::bind(&addr).await?;
         let app = create_router();
         axum::serve(listener, app)
             .with_graceful_shutdown(async move {
-                shutdown_rx.await.ok(); 
+                shutdown_rx.await.ok();
             })
             .await?;
-        
+
         tracing::info!("Servidor HTTP finalizado.");
         Ok(())
     }
@@ -63,7 +63,7 @@ impl Gateway {
         } else {
             tracing::warn!("O sinal de shutdown do Gateway já havia sido enviado.");
         }
-        
+
         Ok(())
     }
 }

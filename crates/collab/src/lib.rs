@@ -1,12 +1,12 @@
 // Define a CollabModule struct
 
+pub mod broker_handlers;
 pub mod domain_model;
 pub mod use_cases;
-pub mod broker_handlers;
 
-pub use domain_model::*;
-pub use use_cases::*;
-pub use broker_handlers::*;
+// pub use domain_model::*;
+// pub use use_cases::*;
+// pub use broker_handlers::*;
 
 pub struct CollabModule {
     // TODO: Implementar módulo de colaboração
